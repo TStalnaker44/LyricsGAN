@@ -87,6 +87,8 @@ class VocabularyEmbedding:
             vocab.append(vocabWord)
         print("Vocab of size ", len(vocab), " generated.")
         self._vocab = vocab
+        self.addUNKTokens()
+        print(self._data[1])
         #print(self._vocab)
 
     def addUNKTokens(self):
