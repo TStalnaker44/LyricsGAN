@@ -14,6 +14,7 @@ import os
 import csv
 from gensim.models import Word2Vec
 import numpy as np
+from nltk.stem.lancaster import LancasterStemmer
 
 LYRICS_FOLDER = "JSON_Files"
 VOCAB_SIZE = 10000
@@ -22,16 +23,18 @@ VECTORIZED_CSV = "vectorizedlyrics.csv"
 WORD_VECTOR_SIZE = 5
 TOKEN = False
 EMBED = True
-RELOAD = True
+RELOAD = False
 
 class LyricsCleaner:
 
     def __init__(self, filename):
         self._filename = filename
-        self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse', '1', ']'), ('[', 'Verse', '2', ']'), ('[', 'Verse', '3', ']'), ('[', 'Verse', '1', ':',']'), ('[', 'Verse', '2', ':', ']'), ('[', 'Verse', '3', ':', ']'), ('[', 'Pre-Chorus', ']'), ('[', 'Chorus', ']'), ('[', 'Post-Chorus', ']'), ('[', 'Bridge', ']'), ('[', 'Intro', ']')])
-        tokenizer.add_mwe(('[', 'Outro', ']'))
-        tokenizer.add_mwe(('[', 'Hook', ']'))
-        tokenizer.add_mwe(('[', 'Pre-Hook', ']'))
+        #self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse', '1', ']'), ('[', 'Verse', '2', ']'), ('[', 'Verse', '3', ']'), ('[', 'Verse', '1', ':',']'), ('[', 'Verse', '2', ':', ']'), ('[', 'Verse', '3', ':', ']'), ('[', 'Pre-Chorus', ']'), ('[', 'Chorus', ']'), ('[', 'Post-Chorus', ']'), ('[', 'Bridge', ']'), ('[', 'Intro', ']')])
+        self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse'), ('[', 'Pre-Chorus'), ('[', 'Chorus'), ('[', 'Post-Chorus'), ('[', 'Bridge'), ('[', 'Intro')])
+        tokenizer.add_mwe(('[', 'Outro'))
+        tokenizer.add_mwe(('[', 'Hook'))
+        tokenizer.add_mwe(('[', 'Pre-Hook'))
+        self._stemmer = LancasterStemmer()
 
     def tokenizeSong(self):
         with open(self._filename) as songJSON:
@@ -52,7 +55,21 @@ class LyricsCleaner:
                     #how is it gonna look loke lyrics if we don't have stop words?
                     if word not in nltk.corpus.stopwords.words("english"):
                         #should we make everything lowercase because capitalization doesn't really matter in songs?
-                        newLyrics += [word.lower()]
+                        newLyrics += [self._stemmer.stem(word.lower())]#[word.lower()]
+                        if word.lower() != self._stemmer.stem(word.lower()):
+                            #print(word.lower(), ": ", self._stemmer.stem(word.lower()))
+                            if word.lower()[:len(word)-1] == self._stemmer.stem(word.lower()):
+                                newLyrics += word.lower()[len(word)-1:]
+                                #print(word.lower()[len(word)-1:])
+                            elif word.lower()[:len(word)-2] == self._stemmer.stem(word.lower()):
+                                newLyrics += word.lower()[len(word)-2:]
+                                #print(word.lower()[len(word)-2:])
+                            elif word.lower()[:len(word)-3] == self._stemmer.stem(word.lower()):
+                                newLyrics += word.lower()[len(word)-3:]
+                                #print(word.lower()[len(word)-3:])
+                            elif word.lower()[len(word)-3:len(word)-1] == "ce" and self._stemmer.stem(word.lower())[len(self._stemmer.stem(word.lower()))-1] == "t":
+                                newLyrics += word.lower()[len(word)-3:len(word)-1]
+                                #print(word.lower()[len(word)-3:len(word)-1])
                 #add end token to the end of a song
                 newLyrics += ['END']
                 return newLyrics
@@ -67,7 +84,7 @@ class VocabularyEmbedding:
              self._data = []
              for line in r:
                  self._data.append(line)
-             print(len(self._data))
+             #print(len(self._data))
              self._vocab = None
              self.generateVocab()
              self._embedding = None
@@ -78,6 +95,7 @@ class VocabularyEmbedding:
         for line in self._data:
             data += line
         fdist = FreqDist(data)
+        print(len(fdist))
         #only keep the 8000 vocab words with the highest frequencies and the start and end tokens kept
         vocabFreqs = fdist.most_common(VOCAB_SIZE + 2)
         vocab = []
@@ -85,10 +103,10 @@ class VocabularyEmbedding:
             #get the word portion of the frequency entries
             vocabWord = freqEntry[0]
             vocab.append(vocabWord)
-        print("Vocab of size ", len(vocab), " generated.")
+        #print("Vocab of size ", len(vocab), " generated.")
         self._vocab = vocab
-        self.addUNKTokens()
-        print(self._data[1])
+        #self.addUNKTokens()
+        #print(self._data[1])
         #print(self._vocab)
 
     def addUNKTokens(self):
@@ -100,8 +118,9 @@ class VocabularyEmbedding:
 
     def generateEmbedding(self):
         #default min_count is 5
-        self._embedding = Word2Vec(self._data, size=WORD_VECTOR_SIZE, min_count=1)
+        self._embedding = Word2Vec(self._data, size=WORD_VECTOR_SIZE, min_count=3)
         words = list(self._embedding.wv.vocab)
+        print(len(words))
 
     def vectorizeWords(self):
         #replace the words in dataset with vectors to be fed into RNN
@@ -143,15 +162,15 @@ def cleanSongsByArtist(currentArtist):
 
 def vectorizeLyrics():
     embedding = VocabularyEmbedding(TOKENIZED_CSV)
-    vectorizedLyrics = embedding.vectorizeWords()
+    #vectorizedLyrics = embedding.vectorizeWords()
     #count = 0
     #for song in vectorizedLyrics:
-    print(vectorizedLyrics[0])
+    #print(vectorizedLyrics[0])
     #writeToCSV(VECTORIZED_CSV, vectorizedLyrics[0])
-    np.savetxt(VECTORIZED_CSV, vectorizedLyrics[0])
-    print(vectorizedLyrics[1])
+    #np.savetxt(VECTORIZED_CSV, vectorizedLyrics[0])
+    #print(vectorizedLyrics[1])
     #writeToCSV(VECTORIZED_CSV, vectorizedLyrics[1])
-    np.savetxt(VECTORIZED_CSV, vectorizedLyrics[1])
+    #np.savetxt(VECTORIZED_CSV, vectorizedLyrics[1])
         #if count > 5:
         #    break
         #count+= 1
