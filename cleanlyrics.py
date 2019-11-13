@@ -21,6 +21,7 @@ VOCAB_SIZE = 10000
 TOKENIZED_CSV = "tokenizedlyrics.csv"
 VECTORIZED_CSV = "vectorizedlyrics.csv"
 WORD_VECTOR_SIZE = 5
+NAMES_CSV = "names.csv"
 TOKEN = False
 EMBED = True
 RELOAD = False
@@ -32,15 +33,20 @@ class LyricsCleaner:
         self._filename = filename
         #self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse', '1', ']'), ('[', 'Verse', '2', ']'), ('[', 'Verse', '3', ']'), ('[', 'Verse', '1', ':',']'), ('[', 'Verse', '2', ':', ']'), ('[', 'Verse', '3', ':', ']'), ('[', 'Pre-Chorus', ']'), ('[', 'Chorus', ']'), ('[', 'Post-Chorus', ']'), ('[', 'Bridge', ']'), ('[', 'Intro', ']')])
         #self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse'), ('[', 'Pre-Chorus'), ('[', 'Chorus'), ('[', 'Post-Chorus'), ('[', 'Bridge'), ('[', 'Intro')])
-        self._tokenizer = tokenizer = MWETokenizer()
+        self._tokenizer = MWETokenizer()
         for word in SIGNAL_WORDS:
-            tokenizer.add_mwe(('[', word, ']'))
+            self._tokenizer.add_mwe(('[', word, ']'))
         #tokenizer.add_mwe(('[', 'Outro'))
         #tokenizer.add_mwe(('[', 'Hook'))
         #tokenizer.add_mwe(('[', 'Pre-Hook'))
         self._stemmer = LancasterStemmer()
 
     def tokenizeSong(self):
+        with open(NAMES_CSV) as nameFile:
+            read = csv.reader(nameFile, delimiter=",")
+            names = []
+            for name in read:
+                names.append(name[0])
         with open(self._filename) as songJSON:
             rawData = json.load(songJSON)
             #get the lyrics from the json file
@@ -50,6 +56,10 @@ class LyricsCleaner:
                 preserveNewline = lyrics.replace("\n", " **NEWLINE** ")
                 #tokenize the lyrics
                 tokenizedLyrics = nltk.word_tokenize(preserveNewline)
+                for k in range(len(tokenizedLyrics)):
+                    if tokenizedLyrics[k] in names:
+                        #print(tokenizedLyrics[k], " = **NAME_VAR**")
+                        tokenizedLyrics[k] = "**NAME_VAR**"
                 #bring the mwe expressions back together
                 tokenizedLyrics = self._tokenizer.tokenize(tokenizedLyrics)
                 #add start token
@@ -207,7 +217,7 @@ def main():
         artists = os.listdir(os.path.join(LYRICS_FOLDER))
         for artist in artists:
             if artist != ".DS_Store":
-                currentArtist = artist #s[0]
+                currentArtist = artist
                 cleanSongsByArtist(currentArtist)
     if EMBED:
         vectorizeLyrics()
