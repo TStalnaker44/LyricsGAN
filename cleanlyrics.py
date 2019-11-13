@@ -15,17 +15,20 @@ import csv
 from gensim.models import Word2Vec
 import numpy as np
 from nltk.stem.lancaster import LancasterStemmer
+import nltk.classify.textcat
+import string
 
 LYRICS_FOLDER = "JSON_Files"
 VOCAB_SIZE = 10000
 TOKENIZED_CSV = "tokenizedlyrics.csv"
-VECTORIZED_CSV = "vectorizedlyrics.csv"
+VECTORIZED_JSON = "vectorizedlyrics.json"
 WORD_VECTOR_SIZE = 5
 NAMES_CSV = "names.csv"
-TOKEN = False
-EMBED = True
+TOKEN = True
+EMBED = False
 RELOAD = False
 SIGNAL_WORDS = ['Verse', 'Pre-Chorus', 'Chorus', 'Post-Chorus', 'Bridge', 'Intro', 'Outro', 'Hook', 'Pre-Hook']
+#COMP_CHARS = string.printable + "“…’”’’‘" + "—"
 
 class LyricsCleaner:
 
@@ -58,8 +61,13 @@ class LyricsCleaner:
                 tokenizedLyrics = nltk.word_tokenize(preserveNewline)
                 for k in range(len(tokenizedLyrics)):
                     if tokenizedLyrics[k] in names:
-                        #print(tokenizedLyrics[k], " = **NAME_VAR**")
                         tokenizedLyrics[k] = "**NAME_VAR**"
+                    #else:
+                    #    for h in range(len(tokenizedLyrics[k])):
+                    #        if not tokenizedLyrics[k][h] in string.printable and len(tokenizedLyrics[k]) > 1 and tokenizedLyrics[k][h] != "…":
+                    #            if h != len(tokenizedLyrics[k]):
+                    #                print(tokenizedLyrics[k] + " ==> " + tokenizedLyrics[k][h])
+                    #                tokenizedLyrics[k] = "**NOT_ENLGISH**"
                 #bring the mwe expressions back together
                 tokenizedLyrics = self._tokenizer.tokenize(tokenizedLyrics)
                 #add start token
@@ -67,10 +75,6 @@ class LyricsCleaner:
                 test = False
                 i = 0
                 while i < len(tokenizedLyrics):
-                    #if test:
-                        #print("I next: ", i)
-                        #test = False
-
                     word = tokenizedLyrics[i]
                     if word == "[":
                         if tokenizedLyrics[i + 1] in SIGNAL_WORDS:
@@ -80,10 +84,6 @@ class LyricsCleaner:
                             word = word + "_" + tokenizedLyrics[i+1] + "_" + tokenizedLyrics[j]
                             newLyrics += [word.lower()]
                             i = j
-                            #print("J: ", j)
-                            #print("I after:", i)
-                            #test = True
-
 
                     #if word is not a stopword, keep it
                     #how is it gonna look loke lyrics if we don't have stop words?
@@ -127,20 +127,23 @@ class VocabularyEmbedding:
              self.generateEmbedding()
 
     def generateVocab(self):
-        data = []
-        for line in self._data:
-            data += line
-        fdist = FreqDist(data)
-        print(len(fdist))
+        embedding = Word2Vec(self._data, size=WORD_VECTOR_SIZE, min_count=2)
+        self._vocab = list(embedding.wv.vocab)
+        print(len(self._vocab))
+        #data = []
+        #for line in self._data:
+            #data += line
+        #fdist = FreqDist(data)
+        #print(len(fdist))
         #only keep the 8000 vocab words with the highest frequencies and the start and end tokens kept
-        vocabFreqs = fdist.most_common(VOCAB_SIZE + 2)
-        vocab = []
-        for freqEntry in vocabFreqs:
+        #vocabFreqs = fdist.most_common(VOCAB_SIZE + 2)
+        #vocab = []
+        #for freqEntry in vocabFreqs:
             #get the word portion of the frequency entries
-            vocabWord = freqEntry[0]
-            vocab.append(vocabWord)
+            #vocabWord = freqEntry[0]
+            #vocab.append(vocabWord)
         #print("Vocab of size ", len(vocab), " generated.")
-        self._vocab = vocab
+        #self._vocab = vocab
         #self.addUNKTokens()
         #print(self._data[1])
         #print(self._vocab)
@@ -150,13 +153,14 @@ class VocabularyEmbedding:
             for i in range(len(self._data[j])):
                 #replace every word not in the vocab with an unknown token
                 if self._data[j][i] not in self._vocab:
+                    print(self._data[j][i], "==> UNK")
                     self._data[j][i] = 'UNK'
 
     def generateEmbedding(self):
         #default min_count is 5
+        self.addUNKTokens()
         self._embedding = Word2Vec(self._data, size=WORD_VECTOR_SIZE, min_count=1)
-        words = list(self._embedding.wv.vocab)
-        print(len(words))
+        #print(len(words))
 
     def vectorizeWords(self):
         #replace the words in dataset with vectors to be fed into RNN
@@ -179,26 +183,102 @@ def writeToCSV(csvFilename, data):
          wr = csv.writer(csvFile)
          wr.writerow(data)
 
-def writeNumPytoCSV(csvFilename, data):
+def writeVectortoJSON(jsonFilename, data):
+    output = {}
+    with open(csvFilename, "a") as csvFile:
+        i = 0
+        artists = os.listdir(os.path.join(LYRICS_FOLDER))
+        for artist in artists:
+            if artist != ".DS_Store":
+                currentArtist = artist
+                output[currentArtist] = {}
+                songs = os.listdir(os.path.join(LYRICS_FOLDER, currentArtist))
+                #print(songs)
+                for song in songs:
+                    if song != ".DS_Store":
+                        print(song)
+                        components = song.split("_")
+                        songName = components[2][:len(componenets[2])-5]
+                        output[currentArtist][songName] = data[0]
+
+                        parser = LyricsCleaner(os.path.join(LYRICS_FOLDER, currentArtist, song))
+                        tokenizedLyrics = parser.tokenizeSong()
+                        if tokenizedLyrics != None:
+                            writeToCSV(TOKENIZED_CSV, tokenizedLyrics)
+                            i+=1
     #with open(csvFilename, "a") as csvFile:
          #wr = csv.writer(csvFile)
          #wr.writerow(data)
     numpy.savetxt(csvFilename, data)
 
-def cleanSongsByArtist(currentArtist):
+class FinalOutput:
+    def __init__(self, filename):
+        self._filename = filename
+        self._output = {}
+
+    def getData(self):
+        return self._output
+
+    def addArtist(self,artist):
+        self._output[artist] = {}
+
+    def addSongByArtist(self, artist, song):
+        components = song.split("_")
+        songName = components[2][:len(components[2])-5]
+        self._output[artist][songName] = {"lyrics": []}
+
+    def addLyricsByArtistAndSong(self, artist, song, lyrics):
+        #lyrics should be a numpy array
+        reshapedLyrics = np.reshape(lyrics, (len(lyrics), WORD_VECTOR_SIZE, 1))
+        print(reshapedLyrics)
+        print(self._output)
+        self._output[artist][song]["lyrics"] = reshapedLyrics.tolist()
+
+    def writeFormatJSON(self):
+        with open("outputformat.json", 'w') as outputFile:
+            json.dump(self._output, outputFile)
+
+    def getOutputFormat(self):
+        with open("outputformat.json", 'r') as inputFile:
+            self._output = json.load(inputFile)
+        return self._output
+
+    def writeToJSON(self):
+        with open(self._filename, 'w') as outputFile:
+            json.dump(self._output, outputFile)
+
+
+def cleanSongsByArtist(currentArtist, outputJson):
     songs = os.listdir(os.path.join(LYRICS_FOLDER, currentArtist))
     #print(songs)
     for song in songs:
         if song != ".DS_Store":
             print(song)
+            outputJson.addSongByArtist(currentArtist, song)
             parser = LyricsCleaner(os.path.join(LYRICS_FOLDER, currentArtist, song))
             tokenizedLyrics = parser.tokenizeSong()
             if tokenizedLyrics != None:
                 writeToCSV(TOKENIZED_CSV, tokenizedLyrics)
+    outputJson.writeFormatJSON()
 
-def vectorizeLyrics():
+def vectorizeLyrics(outputJson):
+    format = outputJson.getOutputFormat()
+    print(format)
     embedding = VocabularyEmbedding(TOKENIZED_CSV)
-    #vectorizedLyrics = embedding.vectorizeWords()
+    print("Starting lyric vectorization.")
+    vectorizedLyrics = embedding.vectorizeWords()
+    print("Done with lyric vectorization.")
+    i=0
+    for artist in format:
+        print(artist)
+        for song in format[artist]:
+            print("\t" + song)
+            lyrics = vectorizedLyrics[i]
+            outputJson.addLyricsByArtistAndSong(artist, song, lyrics)
+            i+=1
+            break
+        break
+    outputJson.writeToJSON()
     #count = 0
     #for song in vectorizedLyrics:
     #print(vectorizedLyrics[0])
@@ -212,18 +292,20 @@ def vectorizeLyrics():
         #count+= 1
 
 def main():
+    outputJson = FinalOutput(VECTORIZED_JSON)
     #create tokenized csv
     if TOKEN:
         artists = os.listdir(os.path.join(LYRICS_FOLDER))
         for artist in artists:
             if artist != ".DS_Store":
                 currentArtist = artist
-                cleanSongsByArtist(currentArtist)
+                outputJson.addArtist(currentArtist)
+                cleanSongsByArtist(currentArtist, outputJson)
     if EMBED:
-        vectorizeLyrics()
+        vectorizeLyrics(outputJson)
 
     if RELOAD:
-        with open(VECTORIZED_CSV, "r") as load:
+        with open(VECTORIZED_JSON, "r") as load:
             r = csv.reader(load, delimiter=",")
             data = []
             for line in r:
