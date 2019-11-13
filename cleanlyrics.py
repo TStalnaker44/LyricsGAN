@@ -24,16 +24,20 @@ WORD_VECTOR_SIZE = 5
 TOKEN = False
 EMBED = True
 RELOAD = False
+SIGNAL_WORDS = ['Verse', 'Pre-Chorus', 'Chorus', 'Post-Chorus', 'Bridge', 'Intro', 'Outro', 'Hook', 'Pre-Hook']
 
 class LyricsCleaner:
 
     def __init__(self, filename):
         self._filename = filename
         #self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse', '1', ']'), ('[', 'Verse', '2', ']'), ('[', 'Verse', '3', ']'), ('[', 'Verse', '1', ':',']'), ('[', 'Verse', '2', ':', ']'), ('[', 'Verse', '3', ':', ']'), ('[', 'Pre-Chorus', ']'), ('[', 'Chorus', ']'), ('[', 'Post-Chorus', ']'), ('[', 'Bridge', ']'), ('[', 'Intro', ']')])
-        self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse'), ('[', 'Pre-Chorus'), ('[', 'Chorus'), ('[', 'Post-Chorus'), ('[', 'Bridge'), ('[', 'Intro')])
-        tokenizer.add_mwe(('[', 'Outro'))
-        tokenizer.add_mwe(('[', 'Hook'))
-        tokenizer.add_mwe(('[', 'Pre-Hook'))
+        #self._tokenizer = tokenizer = MWETokenizer([('[', 'Verse'), ('[', 'Pre-Chorus'), ('[', 'Chorus'), ('[', 'Post-Chorus'), ('[', 'Bridge'), ('[', 'Intro')])
+        self._tokenizer = tokenizer = MWETokenizer()
+        for word in SIGNAL_WORDS:
+            tokenizer.add_mwe(('[', word, ']'))
+        #tokenizer.add_mwe(('[', 'Outro'))
+        #tokenizer.add_mwe(('[', 'Hook'))
+        #tokenizer.add_mwe(('[', 'Pre-Hook'))
         self._stemmer = LancasterStemmer()
 
     def tokenizeSong(self):
@@ -43,33 +47,55 @@ class LyricsCleaner:
             lyrics = rawData["songs"][0]["lyrics"]
             if not lyrics == None:
                 #preserve the newline for prediction
-                preserveNewline = lyrics.replace("\n", " NEWLINE ")
+                preserveNewline = lyrics.replace("\n", " **NEWLINE** ")
                 #tokenize the lyrics
                 tokenizedLyrics = nltk.word_tokenize(preserveNewline)
                 #bring the mwe expressions back together
                 tokenizedLyrics = self._tokenizer.tokenize(tokenizedLyrics)
                 #add start token
                 newLyrics = ['START']
-                for word in tokenizedLyrics:
+                test = False
+                i = 0
+                while i < len(tokenizedLyrics):
+                    #if test:
+                        #print("I next: ", i)
+                        #test = False
+
+                    word = tokenizedLyrics[i]
+                    if word == "[":
+                        if tokenizedLyrics[i + 1] in SIGNAL_WORDS:
+                            j = i + 2
+                            while tokenizedLyrics[j] != "]" and j < len(tokenizedLyrics) - 1:
+                                j += 1
+                            word = word + "_" + tokenizedLyrics[i+1] + "_" + tokenizedLyrics[j]
+                            newLyrics += [word.lower()]
+                            i = j
+                            #print("J: ", j)
+                            #print("I after:", i)
+                            #test = True
+
+
                     #if word is not a stopword, keep it
                     #how is it gonna look loke lyrics if we don't have stop words?
-                    if word not in nltk.corpus.stopwords.words("english"):
-                        #should we make everything lowercase because capitalization doesn't really matter in songs?
-                        newLyrics += [self._stemmer.stem(word.lower())]#[word.lower()]
-                        if word.lower() != self._stemmer.stem(word.lower()):
-                            #print(word.lower(), ": ", self._stemmer.stem(word.lower()))
-                            if word.lower()[:len(word)-1] == self._stemmer.stem(word.lower()):
-                                newLyrics += word.lower()[len(word)-1:]
-                                #print(word.lower()[len(word)-1:])
-                            elif word.lower()[:len(word)-2] == self._stemmer.stem(word.lower()):
-                                newLyrics += word.lower()[len(word)-2:]
-                                #print(word.lower()[len(word)-2:])
-                            elif word.lower()[:len(word)-3] == self._stemmer.stem(word.lower()):
-                                newLyrics += word.lower()[len(word)-3:]
-                                #print(word.lower()[len(word)-3:])
-                            elif word.lower()[len(word)-3:len(word)-1] == "ce" and self._stemmer.stem(word.lower())[len(self._stemmer.stem(word.lower()))-1] == "t":
-                                newLyrics += word.lower()[len(word)-3:len(word)-1]
-                                #print(word.lower()[len(word)-3:len(word)-1])
+                    elif word not in nltk.corpus.stopwords.words("english"):
+                        if not word[2:len(word)-2] == SIGNAL_WORDS:
+                            #should we make everything lowercase because capitalization doesn't really matter in songs?
+                            newLyrics += [self._stemmer.stem(word.lower())]#[word.lower()]
+                            if word.lower() != self._stemmer.stem(word.lower()):
+                                #print(word.lower(), ": ", self._stemmer.stem(word.lower()))
+                                if word.lower()[:len(word)-1] == self._stemmer.stem(word.lower()):
+                                    newLyrics += word.lower()[len(word)-1:]
+                                    #print(word.lower()[len(word)-1:])
+                                elif word.lower()[:len(word)-2] == self._stemmer.stem(word.lower()):
+                                    newLyrics += word.lower()[len(word)-2:]
+                                    #print(word.lower()[len(word)-2:])
+                                elif word.lower()[:len(word)-3] == self._stemmer.stem(word.lower()):
+                                    newLyrics += word.lower()[len(word)-3:]
+                                    #print(word.lower()[len(word)-3:])
+                                elif word.lower()[len(word)-3:len(word)-1] == "ce" and self._stemmer.stem(word.lower())[len(self._stemmer.stem(word.lower()))-1] == "t":
+                                    newLyrics += word.lower()[len(word)-3:len(word)-1]
+                    i += 1
+                                    #print(word.lower()[len(word)-3:len(word)-1])
                 #add end token to the end of a song
                 newLyrics += ['END']
                 return newLyrics
@@ -118,7 +144,7 @@ class VocabularyEmbedding:
 
     def generateEmbedding(self):
         #default min_count is 5
-        self._embedding = Word2Vec(self._data, size=WORD_VECTOR_SIZE, min_count=3)
+        self._embedding = Word2Vec(self._data, size=WORD_VECTOR_SIZE, min_count=1)
         words = list(self._embedding.wv.vocab)
         print(len(words))
 
