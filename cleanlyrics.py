@@ -1,5 +1,5 @@
 """
-Programmed by Abby and Coletta
+Data cleaning by Abby, Coletta, and Angela
 TO TURN IN:
 - this file
 - code to pull genius lyrics
@@ -29,8 +29,8 @@ VECTORIZED_JSON = "vectorizedlyrics.json"
 WORD_VECTOR_SIZE = 5
 NAMES_CSV = "names.csv"
 TOKEN = False
-EMBED = True
-RELOAD = False
+EMBED = False
+RELOAD = True
 SIGNAL_WORDS = ['Verse', 'Pre-Chorus', 'Chorus', 'Post-Chorus', 'Bridge', 'Intro', 'Outro', 'Hook', 'Pre-Hook']
 #COMP_CHARS = string.printable + "“…’”’’‘" + "—"
 
@@ -151,7 +151,7 @@ class VocabularyEmbedding:
             for i in range(len(self._data[j])):
                 #replace every word not in the vocab with an unknown token
                 if self._data[j][i] not in self._vocab:
-                    print(self._data[j][i], "==> UNK")
+                    #print(self._data[j][i], "==> UNK")
                     self._data[j][i] = 'UNK'
 
     def generateEmbedding(self):
@@ -235,7 +235,7 @@ class FinalOutput:
         """saves the lyrics of a song given the artist and the song"""
         #lyrics should be a numpy array
         reshapedLyrics = np.reshape(lyrics, (len(lyrics), WORD_VECTOR_SIZE, 1))
-        print(reshapedLyrics)
+        #print(reshapedLyrics)
         print(self._output)
         self._output[artist][song]["lyrics"] = reshapedLyrics.tolist()
 
@@ -279,7 +279,7 @@ def vectorizeLyrics(outputJson):
     vectorizedLyrics = embedding.vectorizeWords()
     print("Done with lyric vectorization.")
     i=0
-    #right now just does it for the first justin timberlake song because of the break statements
+    #run this on a lab machine because it will take a long af time otherwise
     for artist in format:
         print(artist)
         for song in format[artist]:
@@ -287,8 +287,6 @@ def vectorizeLyrics(outputJson):
             lyrics = vectorizedLyrics[i]
             outputJson.addLyricsByArtistAndSong(artist, song, lyrics)
             i+=1
-            break
-        break
     outputJson.writeToJSON()
 
 def exampleOutput(outputJson):
@@ -324,6 +322,7 @@ def exampleOutput(outputJson):
         json.dump(exData, outputFile)
 
 def main():
+    """change the constants TOKEN, EMBED, and RELOAD to true if you want to run that section"""
     outputJson = FinalOutput(VECTORIZED_JSON)
     #create csv of tokenized words
     if TOKEN:
@@ -340,11 +339,14 @@ def main():
     #test that the data can be easily loaded back in to be processed
     if RELOAD:
         with open(VECTORIZED_JSON, "r") as load:
-            r = csv.reader(load, delimiter=",")
+            preprocessedData = json.load(load)
             data = []
-            for line in r:
-                data.append(line)
-            print(data)
+            for singer in preprocessedData:
+                for song in preprocessedData[singer]:
+                    loadedLyrics = np.array(preprocessedData[singer][song]["lyrics"])
+                    print(loadedLyrics.shape)
+                    data.append(loadedLyrics)
+            #print(data)
 
 if __name__ == "__main__":
    main()
