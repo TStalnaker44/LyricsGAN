@@ -28,9 +28,9 @@ TOKENIZED_CSV = "tokenizedlyrics.csv"
 VECTORIZED_JSON = "vectorizedlyrics.json"
 WORD_VECTOR_SIZE = 5
 NAMES_CSV = "names.csv"
-TOKEN = False
-EMBED = False
-RELOAD = True
+TOKEN = True
+EMBED = True
+RELOAD = False
 SIGNAL_WORDS = ['Verse', 'Pre-Chorus', 'Chorus', 'Post-Chorus', 'Bridge', 'Intro', 'Outro', 'Hook', 'Pre-Hook']
 #COMP_CHARS = string.printable + "“…’”’’‘" + "—"
 
@@ -198,7 +198,7 @@ def writeVectortoJSON(jsonFilename, data):
                 #print(songs)
                 for song in songs:
                     if song != ".DS_Store":
-                        print(song)
+                        #print(song)
                         components = song.split("_")
                         songName = components[2][:len(componenets[2])-5]
                         output[currentArtist][songName] = data[0]
@@ -236,7 +236,7 @@ class FinalOutput:
         #lyrics should be a numpy array
         reshapedLyrics = np.reshape(lyrics, (len(lyrics), WORD_VECTOR_SIZE, 1))
         #print(reshapedLyrics)
-        print(self._output)
+        #print(self._output)
         self._output[artist][song]["lyrics"] = reshapedLyrics.tolist()
 
     def writeFormatJSON(self):
@@ -273,7 +273,7 @@ def cleanSongsByArtist(currentArtist, outputJson):
 def vectorizeLyrics(outputJson):
     """vectorize the songs in the dataset given the output format"""
     format = outputJson.getOutputFormat()
-    print(format)
+    #print(format)
     embedding = VocabularyEmbedding(TOKENIZED_CSV)
     print("Starting lyric vectorization.")
     vectorizedLyrics = embedding.vectorizeWords()
@@ -293,7 +293,7 @@ def exampleOutput(outputJson):
     exampleArtists = ["ariana grande", "taylor swift", "katy perry", "selena gomez", "britney spears"]
     exampleSongs = ["7rings", "newromantics", "cruelsummer", "teenagedream", "lookathernow", "circus"]
     format = outputJson.getOutputFormat()
-    print(format)
+    #print(format)
     embedding = VocabularyEmbedding(TOKENIZED_CSV)
     print("Starting lyric vectorization.")
     vectorizedLyrics = embedding.vectorizeWords()
@@ -302,14 +302,14 @@ def exampleOutput(outputJson):
     #right now just does it for the first justin timberlake song because of the break statements
     for artist in format:
         if artist in exampleArtists:
-            print(artist)
+            #print(artist)
             for song in format[artist]:
                 if song in exampleSongs:
-                    print("\t" + song)
-                    print(i)
+                    #print("\t" + song)
+                    #print(i)
                     lyrics = vectorizedLyrics[i]
                     outputJson.addLyricsByArtistAndSong(artist, song, lyrics)
-                    i+=1
+                i+=1
     with open(VECTORIZED_JSON, 'w') as outputFile:
         fullData = outputJson.getData()
         exData = {}
@@ -334,8 +334,8 @@ def main():
                 cleanSongsByArtist(currentArtist, outputJson)
     #create the embedding for the dataset
     if EMBED:
-        #vectorizeLyrics(outputJson)
-        exampleOutput(outputJson)
+        vectorizeLyrics(outputJson)
+        #exampleOutput(outputJson)
     #test that the data can be easily loaded back in to be processed
     if RELOAD:
         with open(VECTORIZED_JSON, "r") as load:
