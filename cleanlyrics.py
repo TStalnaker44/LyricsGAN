@@ -150,7 +150,7 @@ class VocabularyEmbedding:
         for j in range(len(self._data)):
             for i in range(len(self._data[j])):
                 #replace every word not in the vocab with an unknown token
-                if self._data[j][i] not in self._vocab:
+                if not self._data[j][i] in self._vocab:
                     #print(self._data[j][i], "==> UNK")
                     self._data[j][i] = 'UNK'
 
